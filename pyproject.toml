@@ -1,0 +1,10 @@
+[project]
+name = "alpacabot"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "alpaca-py>=0.42.0",
+    "alpaca-trade-api>=3.2.0",
+]
