@@ -32,3 +32,12 @@ def get_alpaca_api_endpoint():
     if not api_endpoint:
         raise ValueError("ALPACA_API_ENDPOINT environment variable is not set.")
     return api_endpoint
+
+def get_alpaca_both_keys():
+    """
+    Get both the Alpaca API key and secret key.
+    
+    Returns:
+        tuple: A tuple containing the API key and secret key.
+    """
+    return get_alpaca_api_key(), get_alpaca_secret_key()
