@@ -20,7 +20,7 @@ def get_orders(limit:int =100):
     orders = trading_client.get_orders(request_params)
     
     for order in orders:
-        return (f"Order ID: {order.id}, Symbol: {order.symbol}, Side: {order.side}, Status: {order.status}, Filled Qty: {order.filled_qty}, Remaining Qty: {order.remaining_qty}")
+        return (f"Order ID: {order.id}, Symbol: {order.symbol}, Side: {order.side}, Status: {order.status}, Filled Qty: {order.filled_qty}")
 
 def cancel_order(order_id):
     """
