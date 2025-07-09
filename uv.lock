@@ -103,6 +103,7 @@ dependencies = [
     { name = "alpaca-py" },
     { name = "alpaca-trade-api" },
     { name = "dotenv" },
+    { name = "pytz" },
     { name = "ta" },
 ]
 
@@ -111,6 +112,7 @@ requires-dist = [
     { name = "alpaca-py", specifier = ">=0.42.0" },
     { name = "alpaca-trade-api", specifier = ">=3.2.0" },
     { name = "dotenv", specifier = ">=0.9.9" },
+    { name = "pytz", specifier = ">=2025.2" },
     { name = "ta", specifier = ">=0.11.0" },
 ]
 

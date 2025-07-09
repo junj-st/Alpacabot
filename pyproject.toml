@@ -8,5 +8,6 @@ dependencies = [
     "alpaca-py>=0.42.0",
     "alpaca-trade-api>=3.2.0",
     "dotenv>=0.9.9",
+    "pytz>=2025.2",
     "ta>=0.11.0",
 ]
