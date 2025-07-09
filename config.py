@@ -41,3 +41,12 @@ def get_alpaca_both_keys():
         tuple: A tuple containing the API key and secret key.
     """
     return get_alpaca_api_key(), get_alpaca_secret_key()
+
+def get_base_url():
+    """
+    Get the base URL for the Alpaca API.
+    
+    Returns:
+        str: The base URL for the Alpaca API.
+    """
+    return get_alpaca_api_endpoint() or 'https://paper-api.alpaca.markets'  # Default to paper trading URL if not set
