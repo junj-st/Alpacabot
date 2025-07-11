@@ -1,4 +1,3 @@
-
 from alpaca.trading.client import TradingClient
 from config import get_alpaca_api_key, get_alpaca_secret_key
 from alpaca.trading.requests import MarketOrderRequest
@@ -28,7 +27,8 @@ def market_buy(symbol:str, qty:int=100):
 
     market_order = trading_client.submit_order(market_order_data)
     
-    print(f"Market order submitted: {market_order}")
+    return market_order
+
 
 def limit_buy(symbol:str, limit_price:float, qty:int=100):
     """
@@ -82,7 +82,8 @@ def percent_market_buy(symbol:str, percentage:float):
 
     market_order = trading_client.submit_order(market_order_data)
     
-    return(f"Market order submitted: {market_order}")
+    return market_order
+
 
 def percent_limit_buy(symbol:str, limit_price:float, percentage:float):
     """
@@ -115,15 +116,15 @@ def percent_limit_buy(symbol:str, limit_price:float, percentage:float):
     
     return(f"Limit order submitted: {limit_order}")
 
-def market_sell(symbol:str, qty:int=100):
-    """
-    Submits a market order to sell 100 shares of a stock.
-    Args:
-    stock_symbol: str - The stock symbol to trade.
-    Returns:
-    None
-    """
+def market_sell(symbol: str, qty: int = None):
     trading_client = TradingClient(get_alpaca_api_key(), get_alpaca_secret_key())
+
+    if qty is None:
+        qty = get_position_qty(symbol)
+        if qty == 0:
+            print(f"[INFO] No shares to sell for {symbol}")
+            return None
+
     market_order_data = MarketOrderRequest(
         symbol=symbol,
         qty=qty,
@@ -132,8 +133,8 @@ def market_sell(symbol:str, qty:int=100):
     )
 
     market_order = trading_client.submit_order(market_order_data)
-    
     print(f"Market order submitted: {market_order}")
+    return market_order
 
 def limit_sell(symbol:str, limit_price:float, qty:int=100): 
     """
@@ -184,7 +185,8 @@ def percent_market_sell(symbol:str, percentage:float):
 
     market_order = trading_client.submit_order(market_order_data)
     
-    return(f"Market order submitted: {market_order}")
+    return market_order
+
 
 def percent_limit_sell(symbol:str, limit_price:float, percentage:float):
     """
@@ -214,3 +216,15 @@ def percent_limit_sell(symbol:str, limit_price:float, percentage:float):
     limit_order = trading_client.submit_order(limit_order_data)
     
     return(f"Limit order submitted: {limit_order}")
+
+def get_position_qty(symbol: str) -> int:
+    """
+    Returns the quantity of shares held for the given symbol.
+    """
+    trading_client = TradingClient(get_alpaca_api_key(), get_alpaca_secret_key())
+    try:
+        position = trading_client.get_open_position(symbol)
+        return int(float(position.qty))
+    except Exception:
+        # No position or error
+        return 0
