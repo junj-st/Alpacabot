@@ -86,9 +86,6 @@ while True:
         # Remove end-of-day forced sell logic
         # (No call to close_all_positions at/after 3:55 PM)
 
-        # --- Restrict selling in first 2 minutes after open ---
-        allow_sell = not (now_eastern.hour == 9 and now_eastern.minute < 32)
-
         for symbol in TICKERS:
             try:
                 df = get_rsi(symbol, RSI_LENGTH)
@@ -117,38 +114,34 @@ while True:
                     
                     change_pct = (latest_price - entry) / entry * 100
 
-                    # Only allow selling after 9:32 AM ET
-                    if allow_sell:
-                        # Take Profit
-                        if change_pct >= TAKE_PROFIT_PCT:
-                            print(f"{symbol}: Take Profit hit (+{change_pct:.2f}%). Selling...")
-                            result = market_sell(symbol)
-                            if result:
-                                positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
-                            continue
+                    # Always allow selling during market hours
+                    # Take Profit
+                    if change_pct >= TAKE_PROFIT_PCT:
+                        print(f"{symbol}: Take Profit hit (+{change_pct:.2f}%). Selling...")
+                        result = market_sell(symbol)
+                        if result:
+                            positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
+                        continue
 
-                        # Stop Loss
-                        elif change_pct <= -STOP_LOSS_PCT:
-                            print(f"{symbol}: Stop Loss hit ({change_pct:.2f}%). Selling...")
-                            result = market_sell(symbol)
-                            if result:
-                                positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
-                            continue
-                        
-                        # Overbought Exit
-                        elif rsi_now >= OVERBOUGHT:
-                            print(f"{symbol}: RSI overbought ({rsi_now:.2f}). Selling...")
-                            result = market_sell(symbol)
-                            if result:
-                                positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
-                            continue
-                    else:
-                        print(f"{symbol}: Sell signals ignored until 9:32 AM ET.")
-                
+                    # Stop Loss
+                    elif change_pct <= -STOP_LOSS_PCT:
+                        print(f"{symbol}: Stop Loss hit ({change_pct:.2f}%). Selling...")
+                        result = market_sell(symbol)
+                        if result:
+                            positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
+                        continue
+                    
+                    # Overbought Exit
+                    elif rsi_now >= OVERBOUGHT:
+                        print(f"{symbol}: RSI overbought ({rsi_now:.2f}). Selling...")
+                        result = market_sell(symbol)
+                        if result:
+                            positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
+                        continue
+
                 print(f"{symbol}: rsi_prev={rsi_prev}, rsi_now={rsi_now}, open={positions[symbol]['open']}, open_positions={count_open_positions()}")
-                
+
                 # === Entry Signal ===
-                
                 if (not positions[symbol]["open"] and 
                     rsi_prev < OVERSOLD and 
                     rsi_now >= OVERSOLD and
