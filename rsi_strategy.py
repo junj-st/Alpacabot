@@ -7,17 +7,16 @@ import pytz
 
 # === Strategy Parameters ===
 TICKERS = [
-    'ORCL', 'MRNA', 'WBD', 'BA', 'JBL', 'CDNS', 'NVDL', 'RTX', 'FER', 'MDB',
-    'MRVL', 'AMAT', 'TXN', 'IBM', 'HIMS', 'AFRM', 'SOXL', 'LUV', 'TFC',
-    'NSC', 'CCL', 'SWKS'
+    'ORCL', 'MRNA', 'WBD', 'BA', 'NVDL', 'RTX',
+    'MRVL', 'AMAT', 'TXN', 'IBM', 'HIMS', 'AFRM', 'SOXL', 'LUV', 'TFC', 'CCL'
 ]
 RSI_LENGTH = 14
 OVERSOLD = 20
 OVERBOUGHT = 80
-STOP_LOSS_PCT = 2.0
+STOP_LOSS_PCT = 2.5
 TAKE_PROFIT_PCT = 1.0
-TRADE_PERCENTAGE = 0.20  # 20% per position
-MAX_POSITIONS = 5  # Matches 20% per position
+TRADE_PERCENTAGE = 0.33  # 33% per position
+MAX_POSITIONS = 3  # Matches 33% per position
 CHECK_INTERVAL = 0.5  # seconds
 
 # === Position Tracking per Ticker ===
@@ -38,7 +37,6 @@ def is_market_open():
     # Check market hours (9:30 AM - 4:00 PM ET)
     market_open = now_eastern.replace(hour=9, minute=30, second=0, microsecond=0)
     market_close = now_eastern.replace(hour=16, minute=0, second=0, microsecond=0)
-    
     return market_open <= now_eastern <= market_close
 
 def close_all_positions():
@@ -85,11 +83,8 @@ while True:
         # Sync positions every iteration
         sync_positions()
         
-        # Close all positions near market close (3:55 PM)
-        if now_eastern.hour == 15 and now_eastern.minute >= 55:
-            close_all_positions()
-            time.sleep(CHECK_INTERVAL)
-            continue
+        # Remove end-of-day forced sell logic
+        # (No call to close_all_positions at/after 3:55 PM)
 
         # --- Restrict selling in first 2 minutes after open ---
         allow_sell = not (now_eastern.hour == 9 and now_eastern.minute < 32)
