@@ -15,7 +15,6 @@ def get_latest_price(symbol: str) -> float:
     multisymbol_request_params = StockLatestQuoteRequest(symbol_or_symbols=symbol)
 
     latest_multisymbol_quotes = client.get_stock_latest_quote(multisymbol_request_params)
+    latest_bid_price = latest_multisymbol_quotes[symbol].bid_price
 
-    latest_ask_price = latest_multisymbol_quotes[symbol].ask_price
-
-    return latest_ask_price
+    return latest_bid_price

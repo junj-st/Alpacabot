@@ -22,7 +22,7 @@ def get_orders(limit:int =100):
     for order in orders:
         return (f"Order ID: {order.id}, Symbol: {order.symbol}, Side: {order.side}, Status: {order.status}, Filled Qty: {order.filled_qty}")
 
-def cancel_order(order_id):
+def cancel_orders(order_ids:list):
     """
     Cancels an order by its ID.
     
@@ -32,8 +32,8 @@ def cancel_order(order_id):
     Returns:
         str: Confirmation message of the cancellation.
     """
-    trading_client.cancel_order(order_id)
-    return f"Order {order_id} has been cancelled."
+    trading_client.cancel_orders()
+    return f"Order {order_ids} has been cancelled."
 
 def getPositions():
     """

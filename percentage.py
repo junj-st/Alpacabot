@@ -24,7 +24,7 @@ def getEstimate_value(percentage: float):
         float: The estimated portfolio value.
     """
     current_value = getPortfolio_value()
-    return current_value * (percentage / 100.0) if current_value else 0.0
+    return current_value * (percentage) if current_value else 0.0
 
 def getCash_value():
     """
