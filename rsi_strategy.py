@@ -15,8 +15,8 @@ OVERSOLD = 20
 OVERBOUGHT = 80
 STOP_LOSS_PCT = 2.5
 TAKE_PROFIT_PCT = 1.0
-TRADE_PERCENTAGE = 0.33  # 33% per position
-MAX_POSITIONS = 3  # Matches 33% per position
+TRADE_PERCENTAGE = 0.50  # 50% per position
+MAX_POSITIONS = 2  # Matches 50% per position
 CHECK_INTERVAL = 0.5  # seconds
 
 # === Position Tracking per Ticker ===
