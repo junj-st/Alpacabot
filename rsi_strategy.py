@@ -78,9 +78,8 @@ CRYPTO_OVERSOLD = 20
 def is_crypto_trading_time():
     eastern = pytz.timezone("US/Eastern")
     now_eastern = datetime.now(eastern)
-    # 2PM = 14:00, 5AM = 5:00
-    # Crypto trading window: 14:00 <= time < 5:00 (next day)
-    if 14 <= now_eastern.hour or now_eastern.hour < 5:
+    # Crypto trading window: 17:00 <= time < 8:00 (next day)
+    if now_eastern.hour >= 17 or now_eastern.hour < 8:
         return True
     return False
 
@@ -290,14 +289,14 @@ while True:
             print(f"Crypto open positions: {count_open_crypto_positions()}/{CRYPTO_MAX_POSITIONS}")
             print("-" * 50)
         else:
-            # If it's 5AM ET or later, close all open crypto positions
+            # If it's 8AM ET or later, close all open crypto positions
             eastern = pytz.timezone("US/Eastern")
             now_eastern = datetime.now(eastern)
-            if now_eastern.hour == 5 and now_eastern.minute == 0:
+            if now_eastern.hour == 8 and now_eastern.minute == 0:
                 for symbol in CRYPTO_TICKERS:
                     if crypto_positions[symbol]["open"]:
-                        print(f"[CRYPTO] 5AM ET: Closing position in {symbol}")
-                        result = market_sell(symbol)  # Use the same function
+                        print(f"[CRYPTO] 8AM ET: Closing position in {symbol}")
+                        result = market_sell(symbol)
                         if result:
                             crypto_positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
 
