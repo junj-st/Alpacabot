@@ -65,11 +65,6 @@ def sync_positions():
             print(f"Position in {symbol} was closed externally")
             positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
 
-# Add these imports at the top if you have a separate crypto marketdata/trades module
-from crypto_marketdata import get_latest_crypto_price
-from crypto_trades import percent_market_buy_crypto, market_sell_crypto
-from rsi import get_rsi
-
 # === Crypto Strategy Parameters ===
 CRYPTO_TICKERS = ['ETH/USD', 'XRP/USD', 'LINK/USD', 'BTC/USD']
 CRYPTO_STOP_LOSS_PCT = 0.6
@@ -226,8 +221,8 @@ while True:
                         continue
 
                     rsi_now = df['rsi'].iloc[-1]
-                    latest_price = get_latest_crypto_price(symbol)
-                    
+                    latest_price = get_latest_price(symbol)  # Use the same function
+
                     if latest_price is None:
                         print(f"[WARN] No price for {symbol}, skipping.")
                         continue
@@ -244,7 +239,7 @@ while True:
                         # Take Profit
                         if change_pct >= CRYPTO_TAKE_PROFIT_PCT:
                             print(f"{symbol}: Crypto Take Profit hit (+{change_pct:.2f}%). Selling...")
-                            result = market_sell_crypto(symbol)
+                            result = market_sell(symbol)  # Use the same function
                             if result:
                                 crypto_positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
                             continue
@@ -252,7 +247,7 @@ while True:
                         # Stop Loss
                         elif change_pct <= -CRYPTO_STOP_LOSS_PCT:
                             print(f"{symbol}: Crypto Stop Loss hit ({change_pct:.2f}%). Selling...")
-                            result = market_sell_crypto(symbol)
+                            result = market_sell(symbol)  # Use the same function
                             if result:
                                 crypto_positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
                             continue
@@ -263,8 +258,8 @@ while True:
                         count_open_crypto_positions() < CRYPTO_MAX_POSITIONS):
                         
                         print(f"{symbol}: Crypto RSI under {CRYPTO_OVERSOLD} ({rsi_now:.2f}). Buying...")
-                        order = percent_market_buy_crypto(symbol, CRYPTO_TRADE_PERCENTAGE)
-                        
+                        order = percent_market_buy(symbol, CRYPTO_TRADE_PERCENTAGE)  # Use the same function
+
                         if order:
                             try:
                                 actual_entry_price = float(order.filled_avg_price) if hasattr(order, 'filled_avg_price') and order.filled_avg_price else latest_price
@@ -272,7 +267,7 @@ while True:
                             except:
                                 actual_entry_price = latest_price
                                 actual_qty = 0
-                            
+
                             print(f"Crypto Order executed: {order}")
                             crypto_positions[symbol]["open"] = True
                             crypto_positions[symbol]["entry_price"] = actual_entry_price
@@ -302,7 +297,7 @@ while True:
                 for symbol in CRYPTO_TICKERS:
                     if crypto_positions[symbol]["open"]:
                         print(f"[CRYPTO] 5AM ET: Closing position in {symbol}")
-                        result = market_sell_crypto(symbol)
+                        result = market_sell(symbol)  # Use the same function
                         if result:
                             crypto_positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
 
