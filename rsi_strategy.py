@@ -8,7 +8,7 @@ import pytz
 # === Strategy Parameters ===
 TICKERS = [
     'ORCL', 'WBD', 'BA', 'NVDL', 'RTX',
-    'MRVL', 'AMAT', 'TXN', 'IBM', 'AFRM', 'SOXL', 'LUV', 'TFC', 'CCL',
+    'MRVL', 'IBM', 'AFRM', 'SOXL', 'LUV', 'TFC', 'CCL',
     'RMD', 'OKTA', 'PTON', 'ON'
 ]
 RSI_LENGTH = 14
@@ -64,6 +64,36 @@ def sync_positions():
             # Our tracker says we have shares but we don't
             print(f"Position in {symbol} was closed externally")
             positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
+
+# Add these imports at the top if you have a separate crypto marketdata/trades module
+from crypto_marketdata import get_latest_crypto_price
+from crypto_trades import percent_market_buy_crypto, market_sell_crypto
+from rsi import get_rsi
+
+# === Crypto Strategy Parameters ===
+CRYPTO_TICKERS = ['ETH/USD', 'XRP/USD', 'LINK/USD', 'BTC/USD']
+CRYPTO_STOP_LOSS_PCT = 0.6
+CRYPTO_TAKE_PROFIT_PCT = 0.4
+CRYPTO_TRADE_PERCENTAGE = 0.5  # Example: 50% per position
+CRYPTO_MAX_POSITIONS = 2
+CRYPTO_RSI_LENGTH = 14
+CRYPTO_OVERSOLD = 20
+
+# Crypto trading hours: Start after 2PM ET, stop by 5AM ET
+def is_crypto_trading_time():
+    eastern = pytz.timezone("US/Eastern")
+    now_eastern = datetime.now(eastern)
+    # 2PM = 14:00, 5AM = 5:00
+    # Crypto trading window: 14:00 <= time < 5:00 (next day)
+    if 14 <= now_eastern.hour or now_eastern.hour < 5:
+        return True
+    return False
+
+# === Position Tracking per Crypto Ticker ===
+crypto_positions = {symbol: {"open": False, "entry_price": None, "entry_time": None, "qty": 0} for symbol in CRYPTO_TICKERS}
+
+def count_open_crypto_positions():
+    return sum(1 for symbol in crypto_positions if crypto_positions[symbol]["open"])
 
 # === Main Bot Loop ===
 print("Starting RSI Trading Bot...")
@@ -181,6 +211,100 @@ while True:
 
         print(f"Open positions: {count_open_positions()}/{MAX_POSITIONS}")
         print("-" * 50)
+
+        # --- Crypto Trading Logic ---
+        if is_crypto_trading_time():
+            for symbol in CRYPTO_TICKERS:
+                try:
+                    df = get_rsi(symbol, CRYPTO_RSI_LENGTH)
+                    if (
+                        df is None
+                        or 'rsi' not in df.columns
+                        or df['rsi'].isna().iloc[-1]
+                        or len(df) < 2
+                    ):
+                        continue
+
+                    rsi_now = df['rsi'].iloc[-1]
+                    latest_price = get_latest_crypto_price(symbol)
+                    
+                    if latest_price is None:
+                        print(f"[WARN] No price for {symbol}, skipping.")
+                        continue
+
+                    # === Crypto Exit Signal (TP/SL) ===
+                    if crypto_positions[symbol]["open"]:
+                        entry = crypto_positions[symbol]["entry_price"]
+                        if entry is None or entry == 0:
+                            print(f"[WARN] Invalid entry price for {symbol}, skipping exit check.")
+                            continue
+                        
+                        change_pct = (latest_price - entry) / entry * 100
+
+                        # Take Profit
+                        if change_pct >= CRYPTO_TAKE_PROFIT_PCT:
+                            print(f"{symbol}: Crypto Take Profit hit (+{change_pct:.2f}%). Selling...")
+                            result = market_sell_crypto(symbol)
+                            if result:
+                                crypto_positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
+                            continue
+
+                        # Stop Loss
+                        elif change_pct <= -CRYPTO_STOP_LOSS_PCT:
+                            print(f"{symbol}: Crypto Stop Loss hit ({change_pct:.2f}%). Selling...")
+                            result = market_sell_crypto(symbol)
+                            if result:
+                                crypto_positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
+                            continue
+
+                    # === Crypto Entry Signal ===
+                    if (not crypto_positions[symbol]["open"] and 
+                        rsi_now < CRYPTO_OVERSOLD and
+                        count_open_crypto_positions() < CRYPTO_MAX_POSITIONS):
+                        
+                        print(f"{symbol}: Crypto RSI under {CRYPTO_OVERSOLD} ({rsi_now:.2f}). Buying...")
+                        order = percent_market_buy_crypto(symbol, CRYPTO_TRADE_PERCENTAGE)
+                        
+                        if order:
+                            try:
+                                actual_entry_price = float(order.filled_avg_price) if hasattr(order, 'filled_avg_price') and order.filled_avg_price else latest_price
+                                actual_qty = int(float(order.filled_qty)) if hasattr(order, 'filled_qty') and order.filled_qty else 0
+                            except:
+                                actual_entry_price = latest_price
+                                actual_qty = 0
+                            
+                            print(f"Crypto Order executed: {order}")
+                            crypto_positions[symbol]["open"] = True
+                            crypto_positions[symbol]["entry_price"] = actual_entry_price
+                            crypto_positions[symbol]["entry_time"] = datetime.now(pytz.timezone("US/Eastern"))
+                            crypto_positions[symbol]["qty"] = actual_qty
+                        continue
+
+                    # Crypto Status update
+                    if crypto_positions[symbol]["open"]:
+                        entry = crypto_positions[symbol]["entry_price"]
+                        entry_str = f"${entry:.2f}" if entry else "N/A"
+                        change_pct = (latest_price - entry) / entry * 100 if entry else 0
+                        print(f"{symbol}: Crypto RSI={rsi_now:.2f}, Price=${latest_price:.2f}, Entry={entry_str}, P&L={change_pct:+.2f}%, Qty={crypto_positions[symbol]['qty']}")
+                    else:
+                        print(f"{symbol}: Crypto RSI={rsi_now:.2f}, Price=${latest_price:.2f}, No Position")
+
+                except Exception as crypto_error:
+                    print(f"[ERROR] Crypto failed for {symbol}: {crypto_error}")
+
+            print(f"Crypto open positions: {count_open_crypto_positions()}/{CRYPTO_MAX_POSITIONS}")
+            print("-" * 50)
+        else:
+            # If it's 5AM ET or later, close all open crypto positions
+            eastern = pytz.timezone("US/Eastern")
+            now_eastern = datetime.now(eastern)
+            if now_eastern.hour == 5 and now_eastern.minute == 0:
+                for symbol in CRYPTO_TICKERS:
+                    if crypto_positions[symbol]["open"]:
+                        print(f"[CRYPTO] 5AM ET: Closing position in {symbol}")
+                        result = market_sell_crypto(symbol)
+                        if result:
+                            crypto_positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
 
     except Exception as e:
         print(f"[CRITICAL ERROR] {e}")
