@@ -15,7 +15,7 @@ import pytz
 # === Strategy Parameters ===
 TICKERS = [
     'ORCL', 'WBD', 'NVDL',
-    'MRVL', 'IBM', 'AFRM', 'SOXL', 'TFC', 'CCL', 'OKTA', 'PTON', 'ON'
+    'MRVL', 'AFRM', 'SOXL', 'TFC', 'CCL', 'OKTA', 'PTON',
 ]
 RSI_LENGTH = 14
 OVERSOLD = 20
