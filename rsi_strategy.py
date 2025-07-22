@@ -15,14 +15,14 @@ import pytz
 # === Strategy Parameters ===
 TICKERS = [
     'ORCL', 'WBD', 'NVDL',
-    'MRVL', 'AFRM', 'SOXL', 'TFC', 'CCL', 'OKTA', 'PTON'
+    'MRVL', 'AFRM', 'SOXL', 'TFC', 'CCL', 'OKTA', 'PTON', 'PLTR', 'WDC', 'QS'
 ]
 RSI_LENGTH = 14
 OVERSOLD = 20
 OVERBOUGHT = 80
 STOP_LOSS_PCT = 2.5
 TAKE_PROFIT_PCT = 1.0
-TRADE_PERCENTAGE = 0.50  # 50% per position
+TRADE_PERCENTAGE = 1.5  # 100% per position
 MAX_POSITIONS = 2  # Matches 50% per position
 CHECK_INTERVAL = 0.5  # seconds
 
@@ -33,7 +33,7 @@ def count_open_positions():
     return sum(1 for symbol in positions if positions[symbol]["open"])
 
 def is_market_open():
-    """Check if US market is currently open"""
+    """Check if US market is currently open, excluding first 30 min and last 15 min."""
     eastern = pytz.timezone("US/Eastern")
     now_eastern = datetime.now(eastern)
     
@@ -41,17 +41,20 @@ def is_market_open():
     if now_eastern.weekday() >= 5:  # Saturday = 5, Sunday = 6
         return False
     
-    # Check market hours (9:30 AM - 4:00 PM ET)
+    # Market hours (9:30 AM - 4:00 PM ET)
     market_open = now_eastern.replace(hour=9, minute=30, second=0, microsecond=0)
     market_close = now_eastern.replace(hour=16, minute=0, second=0, microsecond=0)
-    return market_open <= now_eastern <= market_close
+    # Restrict first 30 min and last 15 min
+    restricted_start = now_eastern.replace(hour=10, minute=0, second=0, microsecond=0)
+    restricted_end = now_eastern.replace(hour=15, minute=45, second=0, microsecond=0)
+    return restricted_start <= now_eastern < restricted_end
 
 def close_all_positions():
     """Close all open positions at end of day"""
     for symbol in TICKERS:
         if positions[symbol]["open"]:
             print(f"End of day: Closing position in {symbol}")
-            result = market_sell(symbol)  # This will sell all shares
+            result = market_sell(symbol)
             if result:
                 positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
 
@@ -72,11 +75,11 @@ def sync_positions():
             positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
 
 # === Crypto Strategy Parameters ===
-CRYPTO_TICKERS = ['LINK/USD', 'ETH/USD', 'SOL/USD', 'BNB/USD', 'XLM/USD']
+CRYPTO_TICKERS = ['LINK/USD', 'ETH/USD', 'BNB/USD', 'XLM/USD']
 CRYPTO_RSI_LENGTH = 14
 CRYPTO_RSI_BUY = 25
-CRYPTO_TRADE_PERCENTAGE = 0.5  # 50% per position
-CRYPTO_MAX_POSITIONS = 2
+CRYPTO_TRADE_PERCENTAGE = 1.0  # 100% per position
+CRYPTO_MAX_POSITIONS = 1
 
 # === Position Tracking per Crypto Ticker ===
 crypto_positions = {symbol: {"open": False, "entry_price": None, "entry_time": None, "qty": 0} for symbol in CRYPTO_TICKERS}
@@ -114,14 +117,17 @@ print("Starting RSI Trading Bot...")
 
 while True:
     try:
-        # Current US/Eastern time
         eastern = pytz.timezone("US/Eastern")
         now_eastern = datetime.now(eastern)
         current_time_str = now_eastern.strftime("%Y-%m-%d %H:%M")
         
-        # Check if market is open
+        # Check if market is open (excluding first 30 min and last 15 min)
         if not is_market_open():
-            print(f"Market closed at {current_time_str}. Waiting...")
+            # At 15:45 (3:45 PM ET), close all positions
+            if now_eastern.hour == 15 and now_eastern.minute == 45:
+                print("Market close approaching: Closing all positions.")
+                close_all_positions()
+            print(f"Market closed or restricted at {current_time_str}. Waiting...")
             time.sleep(CHECK_INTERVAL)
             continue
         
