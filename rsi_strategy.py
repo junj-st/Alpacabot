@@ -14,9 +14,8 @@ import pytz
 
 # === Strategy Parameters ===
 TICKERS = [
-    'ORCL', 'WBD', 'BA', 'NVDL', 'RTX',
-    'MRVL', 'IBM', 'AFRM', 'SOXL', 'LUV', 'TFC', 'CCL',
-    'RMD', 'OKTA', 'PTON', 'ON'
+    'ORCL', 'WBD', 'NVDL',
+    'MRVL', 'IBM', 'AFRM', 'SOXL', 'TFC', 'CCL', 'OKTA', 'PTON', 'ON'
 ]
 RSI_LENGTH = 14
 OVERSOLD = 20
@@ -73,7 +72,7 @@ def sync_positions():
             positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
 
 # === Crypto Strategy Parameters ===
-CRYPTO_TICKERS = ['LINK/USD', 'ETH/USD']
+CRYPTO_TICKERS = ['LINK/USD', 'ETH/USD', 'SOL/USD', 'BNB/USD', 'XLM/USD']
 CRYPTO_RSI_LENGTH = 14
 CRYPTO_RSI_BUY = 25
 CRYPTO_TRADE_PERCENTAGE = 0.5  # 50% per position
