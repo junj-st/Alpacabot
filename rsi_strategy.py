@@ -75,9 +75,9 @@ def sync_positions():
             positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
 
 # === Crypto Strategy Parameters ===
-CRYPTO_TICKERS = ['LINK/USD', 'ETH/USD', 'BNB/USD', 'XLM/USD']
+CRYPTO_TICKERS = ['LINK/USD', 'ETH/USD', 'BCH/USD', 'AAVE/USD']
 CRYPTO_RSI_LENGTH = 14
-CRYPTO_RSI_BUY = 25
+CRYPTO_RSI_BUY = 14
 CRYPTO_TRADE_PERCENTAGE = 1.0  # 100% per position
 CRYPTO_MAX_POSITIONS = 1
 
@@ -102,13 +102,13 @@ def get_crypto_trade_window_and_params(now_eastern):
         (weekday == 0 and (hour < 8))  # Monday before 8 AM
     ):
         # Weekend trading window
-        return True, 1.5, 2.0  # Stop Loss 1.5%, Take Profit 2%
+        return True, 1.0, 2.0  # Stop Loss 1%, Take Profit 2%
 
     # Weekday windows
     if 17 <= hour or hour < 4:  # 5 PM to 4 AM
-        return True, 1.5, 2.0  # Stop Loss 1.5%, Take Profit 2%
+        return True, 1.0, 2.0  # Stop Loss 1%, Take Profit 2%
     elif 4 <= hour < 9 or (hour == 9 and minute < 30):  # 4 AM to 9:30 AM
-        return True, 2.0, 1.0  # Stop Loss 2%, Take Profit 1%
+        return True, 1.0, 2.0  # Stop Loss 1%, Take Profit 2%
     else:
         return False, None, None  # Not in trading window
 
@@ -198,7 +198,7 @@ while True:
                     order = percent_market_buy(symbol, TRADE_PERCENTAGE)
                     
                     if order:
-                        # Try to get actual fill price from order
+                        # Try to get fill price from order
                         try:
                             actual_entry_price = float(order.filled_avg_price) if hasattr(order, 'filled_avg_price') and order.filled_avg_price else latest_price
                             actual_qty = int(float(order.filled_qty)) if hasattr(order, 'filled_qty') and order.filled_qty else 0
