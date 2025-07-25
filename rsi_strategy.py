@@ -15,16 +15,16 @@ import pytz
 # === Strategy Parameters ===
 TICKERS = [
     'ORCL', 'WBD', 'NVDL',
-    'MRVL', 'AFRM', 'SOXL', 'TFC', 'CCL', 'OKTA', 'PTON', 'PLTR', 'WDC', 'QS'
+    'MRVL', 'AFRM', 'SOXL', 'CCL', 'OKTA', 'PTON', 'PLTR', 'WDC', 'QS'
 ]
 RSI_LENGTH = 14
 OVERSOLD = 20
 OVERBOUGHT = 80
 STOP_LOSS_PCT = 2.5
 TAKE_PROFIT_PCT = 1.0
-TRADE_PERCENTAGE = 1.5  # 100% per position
+TRADE_PERCENTAGE = 1.5  # 150% per position
 MAX_POSITIONS = 2  # Matches 50% per position
-CHECK_INTERVAL = 0.5  # seconds
+CHECK_INTERVAL = 1.0  # seconds
 
 # === Position Tracking per Ticker ===
 positions = {symbol: {"open": False, "entry_price": None, "entry_time": None, "qty": 0} for symbol in TICKERS}
