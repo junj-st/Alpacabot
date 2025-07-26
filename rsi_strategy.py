@@ -1,3 +1,4 @@
+import logging
 from marketdata import get_latest_price
 from trades import (
     percent_market_buy,
@@ -11,11 +12,24 @@ from rsi import get_rsi
 import time
 from datetime import datetime, timedelta
 import pytz
+import json
+import os
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("trading_bot.log"),
+        logging.StreamHandler()
+    ]
+)
 
 # === Strategy Parameters ===
 TICKERS = [
-    'ORCL', 'WBD', 'NVDL',
-    'MRVL', 'AFRM', 'SOXL', 'CCL', 'OKTA', 'PTON', 'PLTR', 'WDC', 'QS'
+    'NVDL', 'WBD', 'CCL', 'PTON', 'QS', 'BABA', 'BULL', 'SMCI', 'AI', 'PONY', 'SNPS', 
+    'HUT', 'FUBO', 'ACHR', 'DLO', 'MTCH', 
+    'MXL', 'CLS', 'ONDS'
 ]
 RSI_LENGTH = 14
 OVERSOLD = 20
@@ -24,7 +38,7 @@ STOP_LOSS_PCT = 2.5
 TAKE_PROFIT_PCT = 1.0
 TRADE_PERCENTAGE = 1.5  # 150% per position
 MAX_POSITIONS = 2  # Matches 50% per position
-CHECK_INTERVAL = 1.0  # seconds
+CHECK_INTERVAL = 0.75  # seconds
 
 # === Position Tracking per Ticker ===
 positions = {symbol: {"open": False, "entry_price": None, "entry_time": None, "qty": 0} for symbol in TICKERS}
@@ -53,7 +67,7 @@ def close_all_positions():
     """Close all open positions at end of day"""
     for symbol in TICKERS:
         if positions[symbol]["open"]:
-            print(f"End of day: Closing position in {symbol}")
+            logging.info(f"End of day: Closing position in {symbol}")
             result = market_sell(symbol)
             if result:
                 positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
@@ -64,14 +78,14 @@ def sync_positions():
         actual_qty = get_position_qty(symbol)
         if actual_qty > 0 and not positions[symbol]["open"]:
             # We have shares but our tracker says we don't
-            print(f"Found untracked position in {symbol}: {actual_qty} shares")
+            logging.info(f"Found untracked position in {symbol}: {actual_qty} shares")
             positions[symbol]["open"] = True
             positions[symbol]["qty"] = actual_qty
             # We don't know the entry price, so we'll use current price
             positions[symbol]["entry_price"] = get_latest_price(symbol)
         elif actual_qty == 0 and positions[symbol]["open"]:
             # Our tracker says we have shares but we don't
-            print(f"Position in {symbol} was closed externally")
+            logging.info(f"Position in {symbol} was closed externally")
             positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
 
 # === Crypto Strategy Parameters ===
@@ -112,8 +126,40 @@ def get_crypto_trade_window_and_params(now_eastern):
     else:
         return False, None, None  # Not in trading window
 
+# File to save positions
+POSITIONS_FILE = "positions.json"
+CRYPTO_POSITIONS_FILE = "crypto_positions.json"
+
+def save_positions():
+    with open(POSITIONS_FILE, "w") as f:
+        json.dump(positions, f, default=str)
+
+def load_positions():
+    if os.path.exists(POSITIONS_FILE):
+        with open(POSITIONS_FILE, "r") as f:
+            data = json.load(f)
+            for symbol in positions:
+                if symbol in data:
+                    positions[symbol] = data[symbol]
+
+def save_crypto_positions():
+    with open(CRYPTO_POSITIONS_FILE, "w") as f:
+        json.dump(crypto_positions, f, default=str)
+
+def load_crypto_positions():
+    if os.path.exists(CRYPTO_POSITIONS_FILE):
+        with open(CRYPTO_POSITIONS_FILE, "r") as f:
+            data = json.load(f)
+            for symbol in crypto_positions:
+                if symbol in data:
+                    crypto_positions[symbol] = data[symbol]
+
 # === Main Bot Loop ===
-print("Starting RSI Trading Bot...")
+logging.info("Starting RSI Trading Bot...")
+
+# Load positions from file
+load_positions()
+load_crypto_positions()
 
 while True:
     try:
@@ -125,9 +171,9 @@ while True:
         if not is_market_open():
             # At 15:45 (3:45 PM ET), close all positions
             if now_eastern.hour == 15 and now_eastern.minute == 45:
-                print("Market close approaching: Closing all positions.")
+                logging.info("Market close approaching: Closing all positions.")
                 close_all_positions()
-            print(f"Market closed or restricted at {current_time_str}. Waiting...")
+            logging.info(f"Market closed or restricted at {current_time_str}. Waiting...")
             time.sleep(CHECK_INTERVAL)
             continue
         
@@ -150,43 +196,46 @@ while True:
                 latest_price = get_latest_price(symbol)
                 
                 if latest_price is None:
-                    print(f"[WARN] No price for {symbol}, skipping.")
+                    logging.warning(f"No price for {symbol}, skipping.")
                     continue
 
                 # === Exit Signal (TP/SL/Overbought) ===
                 if positions[symbol]["open"]:
                     entry = positions[symbol]["entry_price"]
                     if entry is None or entry == 0:
-                        print(f"[WARN] Invalid entry price for {symbol}, skipping exit check.")
+                        logging.warning(f"Invalid entry price for {symbol}, skipping exit check.")
                         continue
                     
                     change_pct = (latest_price - entry) / entry * 100
 
                     # Take Profit
                     if change_pct >= TAKE_PROFIT_PCT:
-                        print(f"{symbol}: Take Profit hit (+{change_pct:.2f}%). Selling...")
+                        logging.info(f"{symbol}: Take Profit hit (+{change_pct:.2f}%). Selling...")
                         result = market_sell(symbol)
                         if result:
                             positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
+                            save_positions()
                         continue
 
                     # Stop Loss
                     elif change_pct <= -STOP_LOSS_PCT:
-                        print(f"{symbol}: Stop Loss hit ({change_pct:.2f}%). Selling...")
+                        logging.info(f"{symbol}: Stop Loss hit ({change_pct:.2f}%). Selling...")
                         result = market_sell(symbol)
                         if result:
                             positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
+                            save_positions()
                         continue
                     
                     # Overbought Exit
                     elif rsi_now >= OVERBOUGHT:
-                        print(f"{symbol}: RSI overbought ({rsi_now:.2f}). Selling...")
+                        logging.info(f"{symbol}: RSI overbought ({rsi_now:.2f}). Selling...")
                         result = market_sell(symbol)
                         if result:
                             positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
+                            save_positions()
                         continue
 
-                print(f"{symbol}: rsi_prev={rsi_prev}, rsi_now={rsi_now}, open={positions[symbol]['open']}, open_positions={count_open_positions()}")
+                logging.info(f"{symbol}: rsi_prev={rsi_prev}, rsi_now={rsi_now}, open={positions[symbol]['open']}, open_positions={count_open_positions()}")
 
                 # === Entry Signal ===
                 if (not positions[symbol]["open"] and 
@@ -194,7 +243,7 @@ while True:
                     rsi_now >= OVERSOLD and
                     count_open_positions() < MAX_POSITIONS):
                     
-                    print(f"{symbol}: RSI crossed above {OVERSOLD} ({rsi_now:.2f}). Buying...")
+                    logging.info(f"{symbol}: RSI crossed above {OVERSOLD} ({rsi_now:.2f}). Buying...")
                     order = percent_market_buy(symbol, TRADE_PERCENTAGE)
                     
                     if order:
@@ -206,11 +255,12 @@ while True:
                             actual_entry_price = latest_price
                             actual_qty = 0
                         
-                        print(f"Order executed: {order}")
+                        logging.info(f"Order executed: {order}")
                         positions[symbol]["open"] = True
                         positions[symbol]["entry_price"] = actual_entry_price
                         positions[symbol]["entry_time"] = now_eastern
                         positions[symbol]["qty"] = actual_qty
+                        save_positions()
                     continue
 
                 # Status update
@@ -218,15 +268,15 @@ while True:
                     entry = positions[symbol]["entry_price"]
                     entry_str = f"${entry:.2f}" if entry else "N/A"
                     change_pct = (latest_price - entry) / entry * 100 if entry else 0
-                    print(f"{symbol}: RSI={rsi_now:.2f}, Price=${latest_price:.2f}, Entry={entry_str}, P&L={change_pct:+.2f}%, Qty={positions[symbol]['qty']}, Time={current_time_str}")
+                    logging.info(f"{symbol}: RSI={rsi_now:.2f}, Price=${latest_price:.2f}, Entry={entry_str}, P&L={change_pct:+.2f}%, Qty={positions[symbol]['qty']}, Time={current_time_str}")
                 else:
-                    print(f"{symbol}: RSI={rsi_now:.2f}, Price=${latest_price:.2f}, No Position, Time={current_time_str}")
+                    logging.info(f"{symbol}: RSI={rsi_now:.2f}, Price=${latest_price:.2f}, No Position, Time={current_time_str}")
 
             except Exception as stock_error:
-                print(f"[ERROR] Failed for {symbol}: {stock_error}")
+                logging.error(f"Failed for {symbol}: {stock_error}")
 
-        print(f"Open positions: {count_open_positions()}/{MAX_POSITIONS}")
-        print("-" * 50)
+        logging.info(f"Open positions: {count_open_positions()}/{MAX_POSITIONS}")
+        logging.info("-" * 50)
 
         # --- Crypto Trading Logic ---
         crypto_trading, stop_loss_pct, take_profit_pct = get_crypto_trade_window_and_params(now_eastern)
@@ -247,32 +297,34 @@ while True:
                     latest_price = get_latest_price(symbol)
 
                     if latest_price is None:
-                        print(f"[CRYPTO][WARN] No price for {symbol}, skipping.")
+                        logging.warning(f"No price for {symbol}, skipping.")
                         continue
 
                     # === Exit Signal (TP/SL) ===
                     if crypto_positions[symbol]["open"]:
                         entry = crypto_positions[symbol]["entry_price"]
                         if entry is None or entry == 0:
-                            print(f"[CRYPTO][WARN] Invalid entry price for {symbol}, skipping exit check.")
+                            logging.warning(f"Invalid entry price for {symbol}, skipping exit check.")
                             continue
 
                         change_pct = (latest_price - entry) / entry * 100
 
                         # Take Profit
                         if change_pct >= take_profit_pct:
-                            print(f"[CRYPTO]{symbol}: Take Profit hit (+{change_pct:.2f}%). Selling...")
+                            logging.info(f"[CRYPTO]{symbol}: Take Profit hit (+{change_pct:.2f}%). Selling...")
                             result = market_sell_crypto(symbol)
                             if result:
                                 crypto_positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
+                                save_crypto_positions()
                             continue
 
                         # Stop Loss
                         elif change_pct <= -stop_loss_pct:
-                            print(f"[CRYPTO]{symbol}: Stop Loss hit ({change_pct:.2f}%). Selling...")
+                            logging.info(f"[CRYPTO]{symbol}: Stop Loss hit ({change_pct:.2f}%). Selling...")
                             result = market_sell_crypto(symbol)
                             if result:
                                 crypto_positions[symbol] = {"open": False, "entry_price": None, "entry_time": None, "qty": 0}
+                                save_crypto_positions()
                             continue
 
                     # === Entry Signal ===
@@ -282,7 +334,7 @@ while True:
                         and rsi_now >= CRYPTO_RSI_BUY
                         and count_open_crypto_positions() < CRYPTO_MAX_POSITIONS
                     ):
-                        print(f"[CRYPTO]{symbol}: RSI crossed above {CRYPTO_RSI_BUY} ({rsi_now:.2f}). Buying...")
+                        logging.info(f"[CRYPTO]{symbol}: RSI crossed above {CRYPTO_RSI_BUY} ({rsi_now:.2f}). Buying...")
                         order = percent_market_buy_crypto(symbol, CRYPTO_TRADE_PERCENTAGE)
                         if order:
                             try:
@@ -291,11 +343,12 @@ while True:
                             except Exception:
                                 actual_entry_price = latest_price
                                 actual_qty = 0
-                            print(f"[CRYPTO] Order executed: {order}")
+                            logging.info(f"[CRYPTO] Order executed: {order}")
                             crypto_positions[symbol]["open"] = True
                             crypto_positions[symbol]["entry_price"] = actual_entry_price
                             crypto_positions[symbol]["entry_time"] = now_eastern
                             crypto_positions[symbol]["qty"] = actual_qty
+                            save_crypto_positions()
                         continue
 
                     # Status update
@@ -303,17 +356,17 @@ while True:
                         entry = crypto_positions[symbol]["entry_price"]
                         entry_str = f"${entry:.2f}" if entry else "N/A"
                         change_pct = (latest_price - entry) / entry * 100 if entry else 0
-                        print(f"[CRYPTO]{symbol}: RSI={rsi_now:.2f}, Price=${latest_price:.2f}, Entry={entry_str}, P&L={change_pct:+.2f}%, Qty={crypto_positions[symbol]['qty']}, Time={current_time_str}")
+                        logging.info(f"[CRYPTO]{symbol}: RSI={rsi_now:.2f}, Price=${latest_price:.2f}, Entry={entry_str}, P&L={change_pct:+.2f}%, Qty={crypto_positions[symbol]['qty']}, Time={current_time_str}")
                     else:
-                        print(f"[CRYPTO]{symbol}: RSI={rsi_now:.2f}, Price=${latest_price:.2f}, No Position, Time={current_time_str}")
+                        logging.info(f"[CRYPTO]{symbol}: RSI={rsi_now:.2f}, Price=${latest_price:.2f}, No Position, Time={current_time_str}")
 
                 except Exception as crypto_error:
-                    print(f"[CRYPTO][ERROR] Failed for {symbol}: {crypto_error}")
+                    logging.error(f"[CRYPTO] Failed for {symbol}: {crypto_error}")
 
-            print(f"[CRYPTO] Open positions: {count_open_crypto_positions()}/{CRYPTO_MAX_POSITIONS}")
-            print("-" * 50)
+            logging.info(f"[CRYPTO] Open positions: {count_open_crypto_positions()}/{CRYPTO_MAX_POSITIONS}")
+            logging.info("-" * 50)
 
     except Exception as e:
-        print(f"[CRITICAL ERROR] {e}")
+        logging.critical(f"{e}")
 
     time.sleep(CHECK_INTERVAL)
